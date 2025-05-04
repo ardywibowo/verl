@@ -1,0 +1,45 @@
+# gsm8k.yaml  (identical values to your original CLI)
+data:
+  train_files: "$HOME/data/gsm8k/train.parquet"
+  val_files:   "$HOME/data/gsm8k/test.parquet"
+  train_batch_size: 256
+  max_prompt_length: 512
+  max_response_length: 256
+
+actor_rollout_ref:
+  model:
+    path: Qwen/Qwen2.5-0.5B-Instruct
+  actor:
+    optim:
+      lr: 1e-6
+    ppo_mini_batch_size: 64
+    ppo_micro_batch_size_per_gpu: 4
+  rollout:
+    log_prob_micro_batch_size_per_gpu: 8
+    tensor_model_parallel_size: 1
+    gpu_memory_utilization: 0.4
+  ref:
+    log_prob_micro_batch_size_per_gpu: 4
+
+critic:
+  model:
+    path: Qwen/Qwen2.5-0.5B-Instruct
+  optim:
+    lr: 1e-5
+  ppo_micro_batch_size_per_gpu: 4
+
+algorithm:
+  kl_ctrl:
+    kl_coef: 0.001
+
+trainer:
+  logger: ['console','wandb']
+  project_name: verl_demo
+  trainer.experiment_name: ppo_gsm8k_qwen25_instruct
+  val_before_train: false
+  default_hdfs_dir: null
+  n_gpus_per_node: 1
+  nnodes: 1
+  save_freq: 10
+  test_freq: 10
+  total_epochs: 15
