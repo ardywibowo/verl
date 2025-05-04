@@ -4,7 +4,7 @@ data:
   val_files:   "$HOME/data/gsm8k/test.parquet"
   train_batch_size: 256
   max_prompt_length: 512
-  max_response_length: 256
+  max_response_length: 4096
 
 actor_rollout_ref:
   model:
@@ -33,12 +33,14 @@ algorithm:
     kl_coef: 0.001
 
 trainer:
-  logger: ['console','wandb']
+  logger: 
+    - 'console'
+    - 'wandb'
   project_name: verl_demo
-  trainer.experiment_name: ppo_gsm8k_qwen25_instruct
+  experiment_name: ppo_gsm8k_qwen25_instruct123
   val_before_train: false
   default_hdfs_dir: null
-  n_gpus_per_node: 1
+  n_gpus_per_node: 8
   nnodes: 1
   save_freq: 10
   test_freq: 10

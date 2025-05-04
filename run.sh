@@ -1,42 +1,59 @@
+#!/usr/bin/env bash
+#
+# Usage:
+#   conda activate iris
+#   ./run_from_yaml.sh gsm8k.yaml                   # run
+#   ./run_from_yaml.sh gsm8k.yaml trainer.total_epochs=5  # plus extra Hydra overrides
+#
+# Requires: python3, PyYAML (`pip install pyyaml`)
 set -euo pipefail
 
-source "private/keys.sh"
+CFG=$1          # first arg = YAML file
+shift           # any extra CLI overrides
 
-python examples/data_preprocess/gsm8k.py --local_dir ~/data/gsm8k
-python -c "import transformers; transformers.pipeline('text-generation', model='Qwen/Qwen2.5-0.5B-Instruct')"
-
-CFG=$1           # first arg = YAML file
-shift            # the rest (if any) are extra Hydra overrides
-
-# Convert YAML → dot-notation overrides
 OVERRIDES=$(python3 - <<'PY' "$CFG"
-import os, sys, json, yaml, re
+import os, sys, yaml, re
 path = sys.argv[1]
-with open(path, 'r') as f:
+with open(path) as f:
     data = yaml.safe_load(f)
+
+def encode_list(lst):
+    """Hydra override grammar: key=[a,b,c]  (no spaces, no quotes)."""
+    items = []
+    for x in lst:
+        if isinstance(x, str):
+            # expand $HOME etc. inside items, keep bare tokens if clean
+            x = os.path.expandvars(x)
+            # quote only if the token has chars Hydra treats specially
+            if re.search(r'[,\[\]=]', x):
+                x = f'"{x}"'
+        elif x is None:
+            x = "null"
+        elif isinstance(x, bool):
+            x = str(x).lower()
+        else:
+            x = str(x)
+        items.append(x)
+    return f"[{','.join(items)}]"
 
 def flatten(node, prefix=""):
     if isinstance(node, dict):
         for k, v in node.items():
             yield from flatten(v, f"{prefix}.{k}" if prefix else k)
     else:
-        # lists → JSON literal, null/bool → YAML-compatible strings
         if isinstance(node, list):
-            v = json.dumps(node)
+            v = encode_list(node)
         elif node is None:
             v = "null"
         elif isinstance(node, bool):
             v = str(node).lower()
         else:
-            v = str(node)
-            # expand $HOME and ${VAR} patterns
-            v = os.path.expandvars(v)
+            v = os.path.expandvars(str(node))
         yield f"{prefix}={v}"
 
 print(" ".join(flatten(data)))
 PY
 )
 
-# Launch VerL exactly like your original CLI
 PYTHONUNBUFFERED=1 python3 -m verl.trainer.main_ppo \
     $OVERRIDES "$@"
